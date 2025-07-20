@@ -1,9 +1,15 @@
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { GoogleGenerativeAI, GoogleGenerativeAIFetchError } from '@google/generative-ai';
 
 dotenv.config();
+
+// Periksa keberadaan API Key saat aplikasi dimulai
+if (!process.env.GEMINI_API_KEY) {
+  console.error("FATAL ERROR: GEMINI_API_KEY tidak terdefinisi. Silakan buat file .env dan tambahkan API key Anda.");
+  process.exit(1); // Hentikan aplikasi jika key tidak ada
+}
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -16,11 +22,7 @@ app.use(express.static('public'));
 // gemini setup
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 const model = genAI.getGenerativeModel({
-  model: 'gemini-1.5-flash'});
-
-app.listen(port, () => {
-  console.log(`Gemini Chatbot running on http://localhost:${port}`);
-});
+  model: 'gemini-2.5-flash'});
 
 
 // Route penting!
@@ -38,7 +40,17 @@ app.post('/api/chat', async (req, res) => {
 
         res.json({ reply: text });
     } catch (err) {
-        console.error(err);
-        res.status(500).json({ reply: "Something went wrong." });
+        console.error("Error saat memanggil Gemini API:", err);
+        // Berikan pesan error yang lebih spesifik
+        if (err instanceof GoogleGenerativeAIFetchError) {
+            return res.status(err.status || 500).json({ reply: `API Error: ${err.message}` });
+        }
+        // Error umum untuk masalah lainnya
+        res.status(500).json({ reply: "Terjadi kesalahan tak terduga di server." });
     }
+});
+
+
+app.listen(port, () => {
+  console.log(`Gemini Chatbot running on http://localhost:${port}`);
 });
